@@ -2,6 +2,22 @@ import Mathlib
 import Archive.Wiedijk100Theorems.HeronsFormula
 import Feuerbach.Aristotle1
 
+
+/-
+TODO: put this to bib
+
+@misc{scheer2011simplevectorprooffeuerbachs,
+      title={A Simple Vector Proof of Feuerbach's Theorem},
+      author={Michael Scheer},
+      year={2011},
+      eprint={1107.1152},
+      archivePrefix={arXiv},
+      primaryClass={math.MG},
+      url={https://arxiv.org/abs/1107.1152},
+}
+
+-/
+
 noncomputable section
 
 
@@ -58,6 +74,22 @@ namespace Affine
 
 namespace Simplex
 
+theorem nsmul_ninePointCircle_center_vsub_circumcenter {n : ℕ} (s : Simplex ℝ P n) :
+    n • (s.ninePointCircle.center -ᵥ s.circumcenter) =
+    (n + 1) • (s.centroid -ᵥ s.circumcenter) := by
+  by_cases hn : n = 0
+  · obtain rfl := hn
+    simp [s.circumcenter_eq_point 0, centroid]
+  rw [Affine.Simplex.ninePointCircle_center]
+  simp_rw [vadd_vsub, ← Nat.cast_smul_eq_nsmul ℝ, smul_smul]
+  rw [mul_div_cancel₀ _ (by simpa using hn)]
+  norm_cast
+
+theorem ninePointCircle_radius_nonneg {n : ℕ} (s : Simplex ℝ P n) :
+    0 ≤ s.ninePointCircle.radius := by
+  rw [s.ninePointCircle_radius]
+  exact div_nonneg s.circumradius_nonneg (by simp)
+
 def volume {n : ℕ} (s : Affine.Simplex ℝ P n) : ℝ :=
   match n with
   | 0 => 1
@@ -111,10 +143,20 @@ def excenterWeightsUnnormBase {n : ℕ} [NeZero n] (s : Simplex ℝ P n)
     (signs : Finset (Fin (n + 1))) (i : Fin (n + 1)) :=
   (if i ∈ signs then -1 else 1) * s.base i
 
+
 end Simplex
 
 
 local notation "w[" s ", " signs ", " i "]" => excenterWeightsUnnormBase s signs i
+
+namespace Simplex
+
+
+theorem excenterWeightsUnnormBase_sq {n : ℕ} [NeZero n] (s : Simplex ℝ P n)
+    (signs : Finset (Fin (n + 1))) (i : Fin (n + 1)) : w[s, signs, i] ^ 2 = s.base i ^ 2 := by
+  by_cases hi : i ∈ signs <;> simp [excenterWeightsUnnormBase, hi]
+
+end Simplex
 
 namespace Triangle
 
@@ -288,30 +330,45 @@ theorem w2_pos (s : Affine.Triangle ℝ P) : 0 < ∑ i, w[s, {2}, i] := by
   convert h.notMem_affineSpan_diff 2 {0, 1, 2}
   grind
 
+theorem w01_neg (s : Affine.Triangle ℝ P) : ∑ i, w[s, {0, 1}, i] < 0 := by
+  obtain h := s.w2_pos
+  simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
+  linarith
+
+theorem w12_neg (s : Affine.Triangle ℝ P) : ∑ i, w[s, {1, 2}, i] < 0 := by
+  obtain h := s.w0_pos
+  simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
+  linarith
+
+theorem w02_neg (s : Affine.Triangle ℝ P) : ∑ i, w[s, {0, 2}, i] < 0 := by
+  obtain h := s.w1_pos
+  simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
+  linarith
+
+theorem w012_neg (s : Affine.Triangle ℝ P) : ∑ i, w[s, {0, 1, 2}, i] < 0 := by
+  obtain h := s.wn_pos
+  simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
+  linarith
+
+theorem volume_sq_eq_heron (s : Affine.Triangle ℝ P) :
+    s.volume ^ 2 = 16⁻¹ * ((∑ i, w[s, ∅, i]) * (∑ i, w[s, {0}, i])
+      * (∑ i, w[s, {1}, i]) * (∑ i, w[s, {2}, i])) := by
+  rw [volume_eq_heron, mul_pow, sq_sqrt ?_]
+  · ring
+  apply le_of_lt
+  apply mul_pos (mul_pos (mul_pos s.wn_pos s.w0_pos) s.w1_pos) s.w2_pos
+
 theorem sum_excenterWeightsUnnormBase_ne_zero (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
     ∑ i, w[s, signs, i] ≠ 0 := by
   fin_cases signs
   · exact s.wn_pos.ne.symm
   · exact s.w0_pos.ne.symm
   · exact s.w1_pos.ne.symm
-  · obtain h := s.w2_pos.ne.symm
-    contrapose! h
-    simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
-    linear_combination -h
+  · exact s.w01_neg.ne
   · exact s.w2_pos.ne.symm
-  · obtain h := s.w1_pos.ne.symm
-    contrapose! h
-    simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
-    linear_combination -h
-  · obtain h := s.w0_pos.ne.symm
-    contrapose! h
-    simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
-    linear_combination -h
-  · obtain h := s.wn_pos.ne.symm
-    contrapose! h
-    simp [Finset.sum, excenterWeightsUnnormBase] at ⊢ h
-    linear_combination -h
-
+  · exact s.w02_neg.ne
+  · exact s.w12_neg.ne
+  · exact s.w012_neg.ne
 
 theorem volume_eq_exradius_mul (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
     s.volume = 2⁻¹ * s.exradius signs * |∑ i, w[s, signs, i]| := by
@@ -348,6 +405,11 @@ theorem volume_eq_div_circumradius (s : Affine.Triangle ℝ P) :
     · grind
   simp [field]
 
+theorem base_mul (s : Affine.Triangle ℝ P) :
+    s.base 0 * s.base 1 * s.base 2 = 4 * s.volume * s.circumradius := by
+  rw [volume_eq_div_circumradius]
+  field [s.circumradius_pos.ne.symm]
+
 theorem excenter_eq_affineCombination' (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
     s.excenter signs = Finset.affineCombination ℝ Finset.univ s.points
       (w[s, signs, ·] / ∑ i, w[s, signs, i]) := by
@@ -361,6 +423,283 @@ theorem excenter_eq_affineCombination' (s : Affine.Triangle ℝ P) (signs : Fins
   obtain _ := s.volume_pos.ne.symm
   simp_rw [← Finset.mul_sum]
   field
+
+theorem sum_w (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
+    ∑ i, (w[s, signs, i] / ∑ j, w[s, signs, j]) = 1 := by
+  rw [← Finset.sum_div]
+  simpa using s.sum_excenterWeightsUnnormBase_ne_zero signs
+
+theorem dist_points_ninePointCircle_center_sq (s : Affine.Triangle ℝ P) (i : Fin 3) :
+    dist (s.points i) (s.ninePointCircle.center) ^ 2 =
+    4⁻¹ * (s.circumradius ^ 2 - s.base i ^ 2 + s.base (i + 1) ^ 2 + s.base (i + 2) ^ 2) := by
+  rw [eq_inv_mul_iff_mul_eq₀ (by simp)]
+  calc
+    _ = (2 * dist (s.points i) (s.ninePointCircle.center)) ^ 2 := by ring
+    _ = (2 * ‖s.points i -ᵥ s.ninePointCircle.center‖) ^ 2 := by rw [dist_eq_norm_vsub]
+    _ = (2 * ‖(s.points i -ᵥ s.circumcenter) -
+      (s.ninePointCircle.center -ᵥ s.circumcenter)‖) ^ 2 := by simp
+    _ = ‖2 • (s.points i -ᵥ s.circumcenter) -
+      2 • (s.ninePointCircle.center -ᵥ s.circumcenter)‖ ^ 2 := by
+      rw [← smul_sub, RCLike.norm_nsmul ℝ, nsmul_eq_mul]
+      norm_cast
+    _ = ‖2 • (s.points i -ᵥ s.circumcenter) - 3 • (s.centroid -ᵥ s.circumcenter)‖ ^ 2 := by
+      rw [nsmul_ninePointCircle_center_vsub_circumcenter]
+    _ = ‖2 • (s.points i -ᵥ s.circumcenter) - ∑ i, (s.points i -ᵥ s.circumcenter)‖ ^ 2 := by
+      rw [Affine.Simplex.centroid_vsub_eq]
+      rw [← Nat.cast_smul_eq_nsmul ℝ 3, smul_smul]
+      norm_num
+    _ = ‖(s.points i -ᵥ s.circumcenter) - (s.points (i + 1) -ᵥ s.circumcenter)
+        - (s.points (i + 2) -ᵥ s.circumcenter)‖ ^ 2 := by
+      congrm ‖?_‖ ^ 2
+      fin_cases i
+      all_goals
+      · simp [Finset.sum, -vsub_sub_vsub_cancel_right]
+        module
+    _ = dist (s.points i) s.circumcenter ^ 2 + dist (s.points (i + 1)) s.circumcenter ^ 2
+      + dist (s.points (i + 2)) s.circumcenter ^ 2
+      + 2 * ⟪s.points (i + 1) -ᵥ s.circumcenter, s.points (i + 2) -ᵥ s.circumcenter⟫
+      - 2 * ⟪s.points (i + 2) -ᵥ s.circumcenter, s.points i -ᵥ s.circumcenter⟫
+      - 2 * ⟪s.points i -ᵥ s.circumcenter, s.points (i + 1) -ᵥ s.circumcenter⟫ := by
+      simp_rw [dist_eq_norm_vsub, ← real_inner_self_eq_norm_sq, inner_sub_left, inner_sub_right,
+        real_inner_comm (s.points (i + 2) -ᵥ s.circumcenter) (s.points (i + 1) -ᵥ s.circumcenter),
+        real_inner_comm (s.points (i + 1) -ᵥ s.circumcenter) (s.points i -ᵥ s.circumcenter),
+        real_inner_comm (s.points i -ᵥ s.circumcenter) (s.points (i + 2) -ᵥ s.circumcenter)]
+      ring
+    _ = _ := by
+      simp_rw [real_inner_eq_norm_mul_self_add_norm_mul_self_sub_norm_sub_mul_self_div_two]
+      simp_rw [vsub_sub_vsub_cancel_right]
+      simp_rw [← pow_two, ← dist_eq_norm_vsub]
+      simp_rw [dist_circumcenter_eq_circumradius]
+      simp_rw [base_eq_dist]
+      simp_rw [add_assoc]
+      simp
+      ring
+
+theorem dist_affineCombination_left' {w : Fin 3 → ℝ} (hw : ∑ i, w i = 1) (s : Affine.Triangle ℝ P)
+    (q : P) :
+    (dist (Finset.affineCombination ℝ Finset.univ s.points w) q) ^ 2 =
+    w 0 * dist (s.points 0) q ^ 2 + w 1 * dist (s.points 1) q ^ 2 + w 2 * dist (s.points 2) q ^ 2 -
+    (w 1 * w 2 * s.base 0 ^ 2 + w 2 * w 0 * s.base 1 ^ 2 + w 0 * w 1 * s.base 2 ^ 2)
+    := by
+  simp [dist_affineCombination_left hw, base_eq_dist]
+
+theorem dist_excenter_ninePointCircle_center_sq (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
+    dist (s.excenter signs) s.ninePointCircle.center ^ 2 =
+    (s.ninePointCircle.radius -
+    s.exradius signs * (|∑ i, w[s, signs, i]| / ∑ i, w[s, signs, i]) * (-1) ^ signs.card) ^ 2 := by
+  obtain := s.sum_excenterWeightsUnnormBase_ne_zero signs
+  have hsum : w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2] = ∑ j, w[s, signs, j] := by
+    simp [Finset.sum, add_assoc]
+  have hprod : (- w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] - w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] + w[s, signs, 1] - w[s, signs, 2]) *
+          (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) =
+      (∑ i, w[s, ∅, i]) * (∑ i, w[s, {0}, i])
+      * (∑ i, w[s, {1}, i]) * (∑ i, w[s, {2}, i]) := by
+    fin_cases signs
+    all_goals
+    · simp [Finset.sum, excenterWeightsUnnormBase]
+      ring
+  have hmul : w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2] =
+      s.base 0 * s.base 1 * s.base 2 * (-1) ^ signs.card := by
+    fin_cases signs
+    <;> simp [excenterWeightsUnnormBase, field]
+  have hn1 : ((-1 : ℝ) ^ signs.card) ^ 2 = 1 := by
+    rw [← pow_mul, mul_comm, pow_mul]
+    simp
+  calc
+    _ = (w[s, signs, 0] / ∑ i, w[s, signs, i]) *
+          (4⁻¹ * (circumradius s ^ 2 - base s 0 ^ 2 + base s 1 ^ 2 + base s 2 ^ 2)) +
+        (w[s, signs, 1] / ∑ i, w[s, signs, i]) *
+          (4⁻¹ * (circumradius s ^ 2 - base s 1 ^ 2 + base s 2 ^ 2 + base s 0 ^ 2)) +
+        (w[s, signs, 2] / ∑ i, w[s, signs, i]) *
+          (4⁻¹ * (circumradius s ^ 2 - base s 2 ^ 2 + base s 0 ^ 2 + base s 1 ^ 2)) -
+        ((w[s, signs, 1] / ∑ i, w[s, signs, i]) * (w[s, signs, 2] / ∑ i, w[s, signs, i])
+          * base s 0 ^ 2 +
+        (w[s, signs, 2] / ∑ i, w[s, signs, i]) * (w[s, signs, 0] / ∑ i, w[s, signs, i])
+          * base s 1 ^ 2 +
+        (w[s, signs, 0] / ∑ i, w[s, signs, i]) * (w[s, signs, 1] / ∑ i, w[s, signs, i])
+          * base s 2 ^ 2)
+       := by
+      rw [excenter_eq_affineCombination']
+      rw [dist_affineCombination_left' (s.sum_w signs)]
+      simp_rw [dist_points_ninePointCircle_center_sq]
+      simp
+    _ = 4⁻¹ * circumradius s ^ 2 *
+          (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) / ∑ i, w[s, signs, i] +
+        4⁻¹ * ((- w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] - w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] + w[s, signs, 1] - w[s, signs, 2])
+          + 2 * w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2]) / ∑ i, w[s, signs, i]
+        -(w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2] / (∑ i, w[s, signs, i]) ^ 2)
+          * (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) := by
+      simp_rw [← s.excenterWeightsUnnormBase_sq signs]
+      field
+     _ = 4⁻¹ * circumradius s ^ 2 +
+        16⁻¹ * ((- w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] - w[s, signs, 1] + w[s, signs, 2]) *
+          (w[s, signs, 0] + w[s, signs, 1] - w[s, signs, 2]) *
+          (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2])) / (4⁻¹ * (∑ i, w[s, signs, i]) ^ 2)
+        - 2⁻¹ * (w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2] / ∑ i, w[s, signs, i])
+           := by
+      simp_rw [hsum]
+      field
+    _ = (2⁻¹ * circumradius s) ^ 2 +
+      (exradius s signs * |∑ i, w[s, signs, i]| / ∑ i, w[s, signs, i]) ^ 2 *
+      ((-1) ^ signs.card) ^ 2 -
+      ((exradius s signs * |∑ i, w[s, signs, i]|/ ∑ i, w[s, signs, i])
+      * circumradius s * (-1) ^ signs.card ) := by
+      rw [hprod, ← volume_sq_eq_heron, hmul, base_mul]
+      rw [s.volume_eq_exradius_mul signs, hn1]
+      field
+    _ = (circumradius s / (2 : ℕ) - exradius s signs *
+        (|∑ i, w[s, signs, i]| / ∑ i, w[s, signs, i]) * (-1) ^ signs.card) ^ 2 := by
+      field
+    _ = _ := by
+      rw [← s.ninePointCircle_radius]
+
+
+theorem dist_excenter_circumcenter (s : Affine.Triangle ℝ P) (signs : Finset (Fin 3)) :
+    dist (s.excenter signs) s.circumcenter ^ 2 =
+    circumradius s * (s.circumradius - 2 * exradius s signs *
+      (-1) ^ signs.card * |∑ i, w[s, signs, i]| / ∑ i, w[s, signs, i]) := by
+  obtain := s.sum_excenterWeightsUnnormBase_ne_zero signs
+  have hsum : w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2] = ∑ i, w[s, signs, i] := by
+    simp [Finset.sum, add_assoc]
+  have hmul : w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2] =
+      s.base 0 * s.base 1 * s.base 2 * (-1) ^ signs.card := by
+    fin_cases signs
+    <;> simp [excenterWeightsUnnormBase, field]
+  calc
+    _ =
+      (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) / (∑ i, w[s, signs, i])
+      * circumradius s ^ 2 -
+      w[s, signs, 0] * w[s, signs, 1] * w[s, signs, 2] / (∑ i, w[s, signs, i]) ^ 2 *
+      (w[s, signs, 0] + w[s, signs, 1] + w[s, signs, 2]) := by
+      rw [s.excenter_eq_affineCombination']
+      rw [dist_affineCombination_left' (s.sum_w signs)]
+      simp_rw [dist_circumcenter_eq_circumradius]
+      simp_rw [← s.excenterWeightsUnnormBase_sq signs]
+      field
+    _ = _ := by
+      simp_rw [hsum, hmul, base_mul, s.volume_eq_exradius_mul signs]
+      field
+
+theorem dist_incenter_circumcenter (s : Affine.Triangle ℝ P) :
+    dist s.incenter s.circumcenter ^ 2 = circumradius s * (s.circumradius - 2 * inradius s) := by
+  convert s.dist_excenter_circumcenter ∅ using 1
+  rw [abs_of_nonneg s.wn_pos.le]
+  obtain _ := s.wn_pos.ne.symm
+  simp [field]
+
+theorem two_mul_inradius_le_circumradius (s : Affine.Triangle ℝ P) :
+    2 * s.inradius ≤ s.circumradius := by
+  rw [← sub_nonneg]
+  refine nonneg_of_mul_nonneg_right ?_ s.circumradius_pos
+  simp [← dist_incenter_circumcenter]
+
+theorem dist_excenter_ninePointCircle_center (s : Affine.Triangle ℝ P)
+    (signs : Finset (Fin 3)) (h1 : signs ≠ ∅) (h2 : signs ≠ Finset.univ) :
+    dist (s.excenter signs) s.ninePointCircle.center =
+    (s.ninePointCircle.radius + s.exradius signs) := by
+  rw [← sq_eq_sq₀ (by simp) (add_nonneg (s.ninePointCircle_radius_nonneg)
+    (s.exradius_nonneg signs))]
+  obtain := s.sum_excenterWeightsUnnormBase_ne_zero signs
+  rw [dist_excenter_ninePointCircle_center_sq]
+  set d := |∑ i, w[s, signs, i]| / ∑ i, w[s, signs, i]
+  fin_cases signs
+  · absurd h1
+    simp
+  · have : d = 1 := by
+      unfold d
+      rw [abs_of_nonneg ?_]
+      · field
+      exact s.w0_pos.le
+    rw [this]
+    simp
+  · have : d = 1 := by
+      unfold d
+      rw [abs_of_nonneg ?_]
+      · field
+      exact s.w1_pos.le
+    rw [this]
+    simp
+  · have : d = -1 := by
+      unfold d
+      rw [abs_of_nonpos ?_]
+      · field
+      exact s.w01_neg.le
+    rw [this]
+    simp
+  · have : d = 1 := by
+      unfold d
+      rw [abs_of_nonneg ?_]
+      · field
+      exact s.w2_pos.le
+    rw [this]
+    simp
+  · have : d = -1 := by
+      unfold d
+      rw [abs_of_nonpos ?_]
+      · field
+      exact s.w02_neg.le
+    rw [this]
+    simp
+  · have : d = -1 := by
+      unfold d
+      rw [abs_of_nonpos ?_]
+      · field
+      exact s.w12_neg.le
+    rw [this]
+    simp
+  · absurd h2
+    ext s
+    simp
+    grind
+
+theorem inradius_le_ninePointCircle_radius (s : Affine.Triangle ℝ P) :
+    s.inradius ≤ s.ninePointCircle.radius := by
+  rw [ninePointCircle_radius]
+  grw [← s.two_mul_inradius_le_circumradius]
+  simp
+
+theorem dist_incenter_ninePointCircle_center (s : Affine.Triangle ℝ P) :
+    dist (s.incenter) s.ninePointCircle.center  =
+    (s.ninePointCircle.radius - s.inradius)  := by
+  rw [← sq_eq_sq₀ (by simp) (sub_nonneg.mpr s.inradius_le_ninePointCircle_radius)]
+  convert s.dist_excenter_ninePointCircle_center_sq ∅
+  obtain := s.sum_excenterWeightsUnnormBase_ne_zero ∅
+  rw [abs_of_nonneg s.wn_pos.le]
+  rw [inradius, exradius]
+  simp [field]
+
+/--
+**Feuerbach's Theorem** for excircles
+-/
+theorem isExtTangent_exsphere_ninePointCircle (s : Affine.Triangle ℝ P)
+    (signs : Finset (Fin 3)) (h1 : signs ≠ ∅) (h2 : signs ≠ Finset.univ) :
+    (s.exsphere signs).IsExtTangent s.ninePointCircle := by
+  rw [Sphere.isExtTangent_iff_dist_center]
+  refine ⟨?_, s.exradius_nonneg signs, s.ninePointCircle_radius_nonneg⟩
+  obtain h := s.dist_excenter_ninePointCircle_center signs h1 h2
+  rw [add_comm] at h
+  exact h
+
+/--
+**Feuerbach's Theorem** for incircle
+-/
+theorem isIntTangent_insphere_ninePointCircle (s : Affine.Triangle ℝ P) :
+    s.insphere.IsIntTangent s.ninePointCircle := by
+  have : Nontrivial V := by
+    obtain h := s.independent
+    contrapose! h
+    rw [affineIndependent_iff_linearIndependent_vsub ℝ _ 0]
+    simp_rw [h.eq_zero]
+    suffices ∃ (i : Fin 3), i ≠ 0 by simpa
+    exact ⟨2, by simp⟩
+  rw [Sphere.isIntTangent_iff_dist_center]
+  refine ⟨?_, s.exradius_nonneg ∅, s.ninePointCircle_radius_nonneg⟩
+  exact s.dist_incenter_ninePointCircle_center
 
 end Triangle
 
