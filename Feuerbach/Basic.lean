@@ -1,6 +1,5 @@
 import Mathlib
 import Archive.Wiedijk100Theorems.HeronsFormula
-import Feuerbach.Aristotle1
 
 
 /-
@@ -163,8 +162,44 @@ namespace Triangle
 
 theorem height_eq_sin_mul (s : Affine.Triangle ℝ P) (i : Fin 3) :
     s.height i = sin (∠ (s.points i) (s.points (i + 1)) (s.points (i + 2)))
-      * dist (s.points i) (s.points (i + 1)) :=
-  height_eq_sin_mul_aristotle s i
+      * dist (s.points i) (s.points (i + 1)) := by
+  obtain h := s.independent.injective
+  obtain h12 := h.ne (show (i + 1) ≠ (i + 2) by simp)
+  rw [height]
+  have hmem : s.altitudeFoot i ∈ affineSpan ℝ {s.points (i + 1), s.points (i + 2)} := by
+    convert s.altitudeFoot_mem_affineSpan_faceOpposite i
+    trans s.points '' {i + 1, i + 2}
+    · grind
+    rw [range_faceOpposite_points]
+    congrm s.points '' ?_
+    grind
+  by_cases! heq : s.altitudeFoot i = s.points (i + 1)
+  · suffices ∠ (s.points i) (s.points (i + 1)) (s.points (i + 2)) = π / 2 by
+      simp [heq, this]
+    rw [← heq, angle_comm]
+    apply angle_orthogonalProjection_self
+    simp
+  obtain h | h := (collinear_insert_of_mem_affineSpan_pair hmem).wbtw_or_wbtw_or_wbtw
+  · have h' : Sbtw ℝ (altitudeFoot s i) (s.points (i + 1)) (s.points (i + 2)) :=
+      ⟨h, heq.symm, h12⟩
+    have hangle : ∠ (s.points i) (s.points (i + 1)) (s.points (i + 2)) =
+        π - ∠ (s.points i) (s.points (i + 1)) (s.altitudeFoot i) := by
+      rw [eq_sub_iff_add_eq]
+      exact EuclideanGeometry.angle_add_angle_eq_pi_of_angle_eq_pi _ h'.angle₃₂₁_eq_pi
+    rw [hangle, sin_pi_sub, angle_comm, sin_angle_mul_dist_of_angle_eq_pi_div_two]
+    rw [angle_comm]
+    apply angle_orthogonalProjection_self
+    simp
+  · have hangle : ∠ (s.points i) (s.points (i + 1)) (s.points (i + 2)) =
+        ∠ (s.points i) (s.points (i + 1)) (s.altitudeFoot i) := by
+      obtain h | h := h
+      · exact Wbtw.angle_eq_right _ h h12.symm
+      · symm
+        apply Wbtw.angle_eq_right _ h.symm heq
+    rw [hangle, angle_comm, sin_angle_mul_dist_of_angle_eq_pi_div_two]
+    rw [angle_comm]
+    apply angle_orthogonalProjection_self
+    simp
 
 theorem base_eq_dist (s : Affine.Triangle ℝ P) (i : Fin 3) :
     s.base i = dist (s.points (i + 1)) (s.points (i + 2)) := by
